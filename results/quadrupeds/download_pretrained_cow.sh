@@ -1,0 +1,2 @@
+echo "----------------------- downloading pretrained model on cows -----------------------"
+wget https://download.cs.stanford.edu/viscam/AnimalKingdom/magicpony/models/pretrained_cow.zip && unzip pretrained_cow.zip

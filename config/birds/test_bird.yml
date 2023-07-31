@@ -1,0 +1,118 @@
+## trainer
+run_train: false
+run_test: true
+batch_size: 10
+checkpoint_dir: results/birds/final_bird
+checkpoint_name: checkpoint0020.pth
+archive_code: false
+use_logger: false
+
+test_data_dir: data/bird_videos_bonanza/test
+test_result_dir: results/birds/final_bird/test_results_bonanza_020
+
+## dataloader
+data_type: sequence  # sequence, image
+in_image_size: 256  # input image size
+out_image_size: 256  # rendered image size
+load_flow: false
+load_dino_feature: true
+load_dino_cluster: false
+num_frames: 1
+skip_beginning: 0
+skip_end: 0
+min_seq_len: 1
+
+## model
+# lr: 0.0001
+background_mode: none  # none (black), white, checkerboard
+
+## MLP
+embed_concat_pts: true
+mlp_hidden_size: 256
+
+## DTMet & renderer
+dmtet_grid_res_smaller: 128
+dmtet_grid_res_smaller_epoch: 4
+dmtet_grid_res: 128
+grid_scale: 7
+jitter_grid: 0.  # full grid within (-0.5, 0.5)
+kd_minmax: [[0., 1.], [0., 1.], [0., 1.]] # range for kd
+bsdf: diffuse
+fov: 25
+renderer_spp: 4
+
+## prior
+prior_lr: 0.001
+init_sdf: ellipsoid  # a constant, 'sphere', 'ellipsoid'
+embedder_freq_shape: 8
+sym_prior_shape: true
+
+num_layers_dino: 5
+embedder_freq_dino: 8
+dino_feature_dim: 16
+dino_feature_recon_dim: 16
+sym_dino: false
+dino_minmax: [0., 1.]
+
+## instance specific
+encoder_pretrained: true
+encoder_frozen: true
+which_vit: dino_vits8  # 'dino_vits8', 'dino_vitb8'
+vit_final_layer_type: conv  # 'none', 'conv'
+latent_dim: 256  # 256, 384 (dino_vits8), 768 (dino_vitb8)
+
+pose_arch: encoder_dino_patch_key  # 'encoder_dino_patch_key', 'encoder_dino_patch_out'
+cam_pos_z_offset: 10
+max_trans_xy_range_ratio: 0.5
+max_trans_z_range_ratio: 0.5
+rot_rep: 'quadlookat'  # euler_angle, quaternion, lookat, quadlookat
+rot_temp_scalar: 1.
+lookat_zeroy: false
+naive_probs_iter: 2000
+best_pose_start_iter: 6000
+
+enable_deform: true
+num_layers_deform: 5
+embedder_freq_deform: 10
+deform_epochs: [6, 1000]  # no deformation fist
+sym_deform: true
+
+enable_articulation: true
+articulation_epochs: [2, 1000]
+articulation_arch: attention  # 'attention', 'mlp'
+articulation_feature_mode: sample+global  # 'global', 'sample', 'sample+global'
+num_layers_arti: 4
+embedder_freq_arti: 8
+num_body_bones: 8
+body_bones_mode: z_minmax_y+  # z_minmax, z_minmax_y+
+num_legs: 0
+static_root_bones: true
+skinning_temperature: 0.05  # the smaller, the peakier
+max_arti_angle: 45
+articulation_multiplier: 0.1
+
+texture_epochs: [0, 1000]
+num_layers_tex: 8
+embedder_freq_tex: 10
+sym_texture: true
+
+enable_lighting: true
+num_layers_light: 5
+amb_diff_minmax: [[0.0, 1.0], [0.5, 1.0]]
+
+## loss weights
+mask_loss_weight: 10.
+mask_dt_loss_weight: 0.
+mask_inv_dt_loss_weight: 100.
+rgb_loss_weight: 1.
+dino_feat_im_loss_weight: 20.
+sdf_reg_decay_start_iter: 10000
+sdf_bce_reg_loss_weight: 0.
+sdf_bce_reg_loss_min_weight: 0.
+sdf_gradient_reg_loss_weight: 0.01
+sdf_gradient_reg_loss_min_weight: 0.01
+logit_loss_weight: 1.
+logit_loss_dino_feat_im_loss_multiplier: 50.  # increase the importance of dino loss for viewpoint hypothesis selection (directly increasing dino recon loss leads to stripe artifacts)
+arti_reg_loss_epochs: [2, 1000]
+arti_reg_loss_weight: 0.
+deformation_reg_loss_weight: 10.
