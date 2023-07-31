@@ -6,6 +6,12 @@
 
 Visual Geometry Group, University of Oxford
 
+
+https://github.com/elliottwu/MagicPony/assets/15921740/2e2f94a4-b16e-458e-b5ac-b69f6249c50d
+
+
+This method learns single-image 3D reconstruction models of articulated animal categories, from just online photo collections, without any 3D geometric supervision or template shapes. 
+
 ## Setup (with [conda](https://docs.conda.io/en/latest/))
 
 ### 1. Install dependencies
