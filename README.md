@@ -75,6 +75,7 @@ python run.py --config config/quadrupeds/test_horse.yml --gpu 0 --num_workers 4
 ```
 
 ## TODO
+- [ ] Test time texture fintuning
 - [ ] Visualization scripts
 - [ ] Evaluation scripts
 - [ ] Data preprocessing scripts
