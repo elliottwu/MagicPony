@@ -1,9 +1,11 @@
 __pycache__
 data/*/
 !data/preprocessing/
+!data/tets/
 pretrained/*/
 results/*/*/
 *.zip
+*.npz
 slurm.bash
 .vscode/
 

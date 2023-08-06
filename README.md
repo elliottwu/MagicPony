@@ -51,6 +51,13 @@ sh download_cow_coco.sh
 ```
 *Note*: `horse_combined` consists of `horse_videos` from [DOVE](https://dove3d.github.io/) and additional images from [Weizmann Horse Database](https://www.kaggle.com/datasets/ztaihong/weizmann-horse-database), [PASCAL](http://host.robots.ox.ac.uk/pascal/VOC/), and [Horse-10](http://www.mackenziemathislab.org/horse10).
 
+### Tetrahedral Grids
+Download the tetrahedral grids:
+```
+cd data/tets
+sh download_tets.sh
+```
+
 ## Pretrained Models
 The pretrained quadruped models can be downloaded using the scripts in `results/`:
 ```
