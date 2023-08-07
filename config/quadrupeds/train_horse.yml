@@ -2,7 +2,7 @@
 run_train: true
 num_epochs: 120
 batch_size: 10
-checkpoint_dir: results/quadupeds/final_horse
+checkpoint_dir: results/quadrupeds/final_horse
 save_checkpoint_freq: 5
 keep_num_checkpoint: -1  # -1 for keeping all checkpoints
 archive_code: true

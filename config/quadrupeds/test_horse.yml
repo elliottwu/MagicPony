@@ -2,13 +2,13 @@
 run_train: false
 run_test: true
 batch_size: 10
-checkpoint_dir: results/quadupeds/final_horse
+checkpoint_dir: results/quadrupeds/final_horse
 checkpoint_name: checkpoint120.pth
 archive_code: false
 use_logger: false
 
 test_data_dir: data/horse_combined/test
-test_result_dir: results/quadupeds/final_horse/test_results_combined_120
+test_result_dir: results/quadrupeds/final_horse/test_results_combined_120
 
 ## dataloader
 data_type: sequence  # sequence, image
