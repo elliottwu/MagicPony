@@ -1,2 +1,2 @@
 echo "----------------------- downloading COCO giraffe dataset -----------------------"
-wget https://download.cs.stanford.edu/viscam/AnimalKingdom/magicpony/data/giraffe_coco.zip && unzip giraffe_coco.zip
+wget https://download.cs.stanford.edu/viscam/AnimalKingdom/magicpony/data/giraffe_coco.zip && unzip -q giraffe_coco.zip

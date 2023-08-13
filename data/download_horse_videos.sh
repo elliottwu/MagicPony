@@ -1,2 +1,2 @@
 echo "----------------------- downloading horse video dataset -----------------------"
-wget https://download.cs.stanford.edu/viscam/AnimalKingdom/magicpony/data/horse_videos_multi.zip && unzip horse_videos_multi.zip
+wget https://download.cs.stanford.edu/viscam/AnimalKingdom/magicpony/data/horse_videos_multi.zip && unzip -q horse_videos_multi.zip
