@@ -1,6 +1,8 @@
 __pycache__
 data/*/
 !data/preprocessing/
+!data/tets/
+data/tets/*.npz
 pretrained/*/
 results/*/*/
 *.zip
