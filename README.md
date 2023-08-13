@@ -51,13 +51,6 @@ sh download_cow_coco.sh
 ```
 *Note*: `horse_combined` consists of `horse_videos` from [DOVE](https://dove3d.github.io/) and additional images from [Weizmann Horse Database](https://www.kaggle.com/datasets/ztaihong/weizmann-horse-database), [PASCAL](http://host.robots.ox.ac.uk/pascal/VOC/), and [Horse-10](http://www.mackenziemathislab.org/horse10).
 
-### Tetrahedral Grids
-Download the tetrahedral grids:
-```
-cd data/tets
-sh download_tets.sh
-```
-
 ## Pretrained Models
 The pretrained quadruped models can be downloaded using the scripts in `results/`:
 ```
@@ -81,9 +74,17 @@ python run.py --config config/quadrupeds/train_horse.yml --gpu 0 --num_workers 4
 python run.py --config config/quadrupeds/test_horse.yml --gpu 0 --num_workers 4
 ```
 
+## Visualize Results
+Check `scripts/visualize_results.py` and run, eg:
+```
+python scripts/visualize_results.py --input_image_dir path/to/folder/that/contains/input/images --config the/config/used/to/train/the/model.yml --checkpoint_path path/to/the/pretrained/checkpoint.pth --output_dir folder/to/save/the/renderings
+```
+
+To enable test time texture finetuning, use `--finetune_texture`, and (optionally) specify the number of finetune iterations and learning rate.
+
 ## TODO
-- [ ] Test time texture fintuning
-- [ ] Visualization scripts
+- [x] Test time texture finetuning
+- [x] Visualization scripts
 - [ ] Evaluation scripts
 - [ ] Data preprocessing scripts
 

@@ -89,10 +89,8 @@ def shade(
             shaded_col = kd
         elif isinstance(lgt, light.EnvironmentLight):
             shaded_col = lgt.shade(gb_pos, gb_normal, kd, ks, view_pos, specular=False)
-        elif isinstance(lgt, light.DirectionalLight):
-            shaded_col, shading = lgt.shade(feat, kd, cam_normal)
         else:
-            assert False, "Invalid light type"
+            shaded_col, shading = lgt.shade(feat, kd, cam_normal)
     else:
         assert False, "Invalid BSDF '%s'" % bsdf
 

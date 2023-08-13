@@ -419,10 +419,14 @@ class InstancePredictor(nn.Module):
         articulated_shape = mesh.make_mesh(verts_articulated, shape.t_pos_idx, v_tex, shape.t_tex_idx, shape.material)
         return articulated_shape, articulation_angles, aux
     
-    def get_camera_extrinsics_from_pose(self, pose, znear=0.1, zfar=1000.):
+    def get_camera_extrinsics_from_pose(self, pose, znear=0.1, zfar=1000., offset_extra=None):
         N = len(pose)
         pose_R = pose[:, :9].view(N, 3, 3).transpose(2, 1)  # to be compatible with pytorch3d
-        pose_T = pose[:, -3:] + self.cam_pos_offset.to(pose.device)
+        if offset_extra is not None:
+            cam_pos_offset = torch.FloatTensor([0, 0, -self.cam_pos_z_offset - offset_extra]).to(pose.device)
+        else:
+            cam_pos_offset = torch.FloatTensor([0, 0, -self.cam_pos_z_offset]).to(pose.device)
+        pose_T = pose[:, -3:] + cam_pos_offset[None, None, :]
         pose_T = pose_T.view(N, 3, 1)
         pose_RT = torch.cat([pose_R, pose_T], axis=2)  # Nx3x4
         w2c = torch.cat([pose_RT, torch.FloatTensor([0, 0, 0, 1]).repeat(N, 1, 1).to(pose.device)], axis=1)  # Nx4x4

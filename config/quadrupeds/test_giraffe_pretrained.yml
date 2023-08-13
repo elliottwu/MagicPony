@@ -2,13 +2,13 @@
 run_train: false
 run_test: true
 batch_size: 10
-checkpoint_dir: results/quadrupeds/pretrained_giraffe
+checkpoint_dir: results/quadupeds/pretrained_giraffe
 checkpoint_name: pretrained_giraffe.pth
 archive_code: false
 use_logger: false
 
 test_data_dir: data/giraffe_coco/test
-test_result_dir: results/quadrupeds/pretrained_giraffe/test_results_800
+test_result_dir: results/quadupeds/pretrained_giraffe/test_results_800
 
 ## dataloader
 data_type: sequence  # sequence, image

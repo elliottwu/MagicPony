@@ -2,7 +2,7 @@ import os
 import json
 import time
 import torch
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import collections
 
 

@@ -282,7 +282,7 @@ class MagicPony:
             losses['flow_loss'] = (flow_loss.reshape(batch_size, num_frames-1, -1).sum(2) / num_mask_pixels)
 
         ## DINO feature loss
-        if dino_feat_im_pred is not None:
+        if dino_feat_im_pred is not None and dino_feat_im_gt is not None:
             dino_feat_loss = (dino_feat_im_pred - dino_feat_im_gt) ** 2
             dino_feat_loss = dino_feat_loss * mask_both_binary.unsqueeze(2)
             losses['dino_feat_im_loss'] = dino_feat_loss.reshape(batch_size, num_frames, -1).mean(2)
@@ -304,12 +304,10 @@ class MagicPony:
     
     def forward(self, batch, epoch, logger=None, total_iter=None, save_results=False, save_dir=None, logger_prefix='', is_training=True):
         input_image, mask_gt, mask_dt, mask_valid, flow_gt, bbox, bg_image, dino_feat_im, dino_cluster_im, seq_idx, frame_idx = (*map(lambda x: validate_tensor_to_device(x, self.device), batch),)
-        seq_idx = seq_idx.squeeze(1)
-        global_frame_id, crop_x0, crop_y0, crop_w, crop_h, full_w, full_h, sharpness = bbox.unbind(2)  # BxFx8
-        bbox = torch.stack([crop_x0, crop_y0, crop_w, crop_h], 2)
+        global_frame_id, _, _, _, _, _, _, _ = bbox.unbind(2)  # BxFx8
         mask_gt = (mask_gt[:, :, 0, :, :] > 0.9).float()  # BxFxHxW
         mask_dt = mask_dt / self.in_image_size
-        batch_size, num_frames, _, h0, w0 = input_image.shape  # BxFxCxHxW
+        batch_size, num_frames, _, _, _ = input_image.shape  # BxFxCxHxW
         h = w = self.out_image_size
         aux_viz = {}
 
