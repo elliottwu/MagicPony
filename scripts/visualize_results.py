@@ -6,14 +6,18 @@ import glob
 sys.path.append(osp.abspath(osp.join(__file__, "../../")))
 
 import argparse
+import glob
 from tqdm import tqdm
 from PIL import Image
+from moviepy.editor import ImageSequenceClip
 import numpy as np
+from pytorch3d import transforms
 import torch
 import torchvision
 import nvdiffrast.torch as dr
 from magicpony.model import MagicPony
 from magicpony import setup_runtime
+from magicpony.render.mesh import make_mesh
 from magicpony.geometry.skinning import estimate_bones, skinning, euler_angles_to_matrix
 from magicpony.render import util
 
@@ -80,14 +84,22 @@ def main(args):
     render_mode = args.render_mode
     checkpoint_path = args.checkpoint_path
     output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+
     batch_size = args.batch_size
     if args.finetune_texture:
         batch_size = 1  # finetune texture one by one
+    if "rotation" in render_mode or "canon" in render_mode or "animation" in render_mode:
+        batch_size = 1  # render video one by one
     input_image_dir = args.input_image_dir
     
     # 0. Initialize model.
     model_cfgs = setup_runtime(args)
     model = MagicPony(model_cfgs)
+    cp = torch.load(checkpoint_path)
+    epoch = cp.get('epoch', 999)
+    total_iter = cp.get('total_iter', 999999)
+    model.load_model_state(cp)
     device = "cuda:0"
     model.to(device)
 
@@ -106,10 +118,8 @@ def main(args):
 
         # 1.1. Finetune the model if needed.
         if args.finetune_texture:
-            cp = torch.load(checkpoint_path)
-            model.load_model_state(cp)
-            epoch = cp.get('epoch', 999)
-            total_iter = cp.get('total_iter', 999999)
+            if i > 0:
+                model.load_model_state(cp)
 
             num_iters = args.finetune_iters
             lr = args.finetune_lr
@@ -162,9 +172,14 @@ def main(args):
             input_image = input_image[:, None, :, :]
 
             prior_shape, dino_pred = model.netPrior(is_training=False)
-            shape, _, _, mvp, w2c, campos, texture_pred, im_features, deform, all_arti_params, light, forward_aux = \
+            shape, pose_raw, pose, mvp, w2c, campos, texture_pred, im_features, deform, all_arti_params, light, forward_aux = \
                 model.netInstance(input_image, prior_shape,
                                   epoch, total_iter, is_training=False)
+
+            if deform is not None:
+                deformed_shape = prior_shape.deform(deform)
+            else:
+                deformed_shape = prior_shape
 
             if "input_view" in render_mode:
                 shaded, shading, albedo = \
@@ -196,31 +211,31 @@ def main(args):
                         i+batch_size, total_num + 1)], output_dir, suffix="_input_view_mesh")
 
             if "other_views" in render_mode:
-                pose_canon = torch.concat(
+                canonical_pose = torch.concat(
                     [torch.eye(3), torch.zeros(1, 3)], dim=0).view(-1)[None].to(device)
-                mvp_canon, w2c_canon, campos_canon = model.netInstance.get_camera_extrinsics_from_pose(
-                    pose_canon, offset_extra=5.5)
+                canonical_mvp, canonical_w2c, canonical_campos = model.netInstance.get_camera_extrinsics_from_pose(
+                    canonical_pose, offset_extra=5.5)
                 
                 instance_rotate_angles = [torch.FloatTensor([0, angle, 0]) / 180 * np.pi for angle in range(0, 360, 30)]
                 
                 gray_light = FixedDirectionLight(direction=torch.FloatTensor(
                     [0, 0, 1]).to(device), amb=0.2, diff=0.7)
-                for angle_id, rot_angle in enumerate(instance_rotate_angles):
+                for idx, rot_angle in enumerate(instance_rotate_angles):
                     mtx = torch.eye(4).to(device)
                     mtx[:3, :3] = euler_angles_to_matrix(rot_angle, "XYZ")
-                    cur_w2c = torch.matmul(w2c_canon, mtx[None])
-                    cur_mvp = torch.matmul(mvp_canon, mtx[None])
-                    cur_campos = campos_canon @ torch.linalg.inv(mtx[:3, :3]).T
+                    cur_w2c = torch.matmul(canonical_w2c, mtx[None])
+                    cur_mvp = torch.matmul(canonical_mvp, mtx[None])
+                    cur_campos = canonical_campos @ torch.linalg.inv(mtx[:3, :3]).T
 
-                    shaded, shading, albedo = \
-                        model.render(["shaded", "shading", "kd"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
                                     im_features=im_features, light=gray_light, prior_shape=prior_shape,
                                     dino_net=dino_pred, spp=4, num_frames=1)
                     image_pred = shaded[:, :3, :, :]
                     mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
                     shading = shading.expand_as(image_pred)
                     save_images(shading, mask_pred, save_basenames[i:min(
-                        i+batch_size, total_num + 1)], output_dir, suffix="_other_view_mesh_%d" % angle_id, mode="transparent")
+                        i+batch_size, total_num + 1)], output_dir, suffix="_other_view_mesh_%d" % idx, mode="transparent")
 
                     _ = model.render(["shaded"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
                                      im_features=im_features, light=light, prior_shape=prior_shape,
@@ -242,7 +257,258 @@ def main(args):
                     image_pred = shaded[:, :3, :, :]
                     mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
                     save_images(image_pred, mask_pred, save_basenames[i:min(
-                        i+batch_size, total_num + 1)], output_dir, suffix="_other_view_textured_%d" % angle_id, mode="transparent")
+                        i+batch_size, total_num + 1)], output_dir, suffix="_other_view_textured_%d" % idx, mode="transparent")
+
+            if "rotation" in render_mode:
+                rotation_angles = np.linspace(0, 360, 75) / 180 * np.pi
+                gray_light = FixedDirectionLight(direction=torch.FloatTensor([0, 0, 1]).to(device), amb=0.2, diff=0.7)
+                canonical_pose = torch.concat([torch.eye(3), torch.zeros(1, 3)], dim=0).view(-1)[None].to(device)
+                canonical_mvp, canonical_w2c, canonical_campos = model.netInstance.get_camera_extrinsics_from_pose(
+                    canonical_pose, offset_extra=4)
+                
+                for idx, angle in enumerate(rotation_angles):
+                    rot_angle = torch.FloatTensor([0, angle, 0]).to(device)
+                    mtx = torch.eye(4).to(device)
+                    mtx[:3, :3] = euler_angles_to_matrix(rot_angle, "XYZ")
+                    cur_w2c = torch.matmul(w2c, mtx[None])
+                    cur_mvp = torch.matmul(mvp, mtx[None])
+                    cur_campos = torch.bmm(torch.linalg.inv(mtx)[None], torch.concat(
+                        [campos, torch.ones_like(campos[..., :1])], dim=-1)[..., None]).squeeze(-1)
+                    cur_campos = cur_campos[..., :3] / cur_campos[..., 3:]
+
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=gray_light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+                    image_pred = shaded[:, :3, :, :]
+                    mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
+                    shading = shading.expand_as(image_pred)
+                    save_images(shading, mask_pred, save_basenames[i:min(
+                        i+batch_size, total_num + 1)], output_dir, suffix="_{:02d}_rotation_video_mesh".format(idx), mode="white")
+
+                    _ = model.render(["shaded"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+
+                    ori_light_dir = light.light_params[..., :3]
+                    final_dir = torch.matmul(ori_light_dir, w2c[:, :3, :3])
+                    final_dir = torch.matmul(final_dir, cur_w2c[:, :3, :3].transpose(2, 1))[:, 0]
+                    amb, diff = light.light_params[..., 3:4], light.light_params[..., 4:5]
+                    cur_light = FixedDirectionLight(direction=final_dir, amb=amb, diff=diff)
+
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=cur_light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+                    image_pred = shaded[:, :3, :, :]
+                    mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
+                    save_images(image_pred, mask_pred, save_basenames[i:min(
+                        i+batch_size, total_num + 1)], output_dir, suffix="_{:02d}_rotation_video_textured".format(idx), mode="white")
+
+                rot_imgs = sorted(glob.glob(osp.join(output_dir, "*_rotation_video_mesh.png")))
+                rot_imgs_textured = sorted(glob.glob(osp.join(output_dir, "*_rotation_video_textured.png")))
+                clip = ImageSequenceClip(rot_imgs, fps=25)
+                clip.write_videofile(osp.join(output_dir, save_basenames[i] + "_rotation_mesh.mp4"))
+                clip_textured = ImageSequenceClip(rot_imgs_textured, fps=25)
+                clip_textured.write_videofile(osp.join(output_dir, save_basenames[i] + "_rotation_textured.mp4"))
+                for img in rot_imgs:
+                    os.remove(img)
+                for img in rot_imgs_textured:
+                    os.remove(img)
+
+            if "canon" in render_mode:
+                if args.category != "horse":
+                    raise NotImplementedError("Canon mode is only supported for horse.")
+                
+                num_frames = 25
+                
+                canon_viewpoint = torch.FloatTensor([0, -120, 0]) / 180 * np.pi
+                canon_viewpoint_axis = transforms.matrix_to_axis_angle(
+                    transforms.euler_angles_to_matrix(canon_viewpoint, convention="XYZ"))
+                
+                arti_param_dir = osp.dirname(__file__)
+                arti_param_files = sorted(glob.glob(osp.join(arti_param_dir, "*.txt")))
+                animation_start_arti_param = np.loadtxt(arti_param_files[0]) / 180 * np.pi
+
+                pose_R = pose[:, :9].view(1, 3, 3)
+                ori_viewpoint = transforms.matrix_to_euler_angles(pose_R.transpose(-2, -1), convention="XYZ").view(3)
+                ori_viewpoint_axis = transforms.matrix_to_axis_angle(pose_R.transpose(-2, -1)).view(3)
+                pose_T = pose[:, -3:].view(1, 3, 1)
+                starting_arti_param = all_arti_params.clone()
+
+                deformed_bones, kinematic_tree, _ = estimate_bones(
+                    deformed_shape.v_pos[:, None], model.netInstance.num_body_bones, n_legs=model.netInstance.num_legs, n_leg_bones=model.netInstance.num_leg_bones,
+                    body_bones_mode=model.netInstance.body_bones_mode, compute_kinematic_chain=True, aux=model.netInstance.bone_aux, attach_legs_to_body=True)
+
+                for frame_id in range(num_frames):
+                    viewpoint_axis = ori_viewpoint_axis * \
+                        (1 - frame_id / (num_frames - 1)) + \
+                        canon_viewpoint_axis.to(
+                            device) * (frame_id / (num_frames - 1))
+                    cur_pose_R = transforms.axis_angle_to_matrix(
+                        viewpoint_axis).view(1, 3, 3).to(device).transpose(1, 2)
+                    cur_cam_dist = 10 * (1 - frame_id / (num_frames - 1)) + 14 * (frame_id / (num_frames - 1))
+                    cur_pose_T = pose_T * (1 - frame_id / (num_frames - 1))
+                    cur_pose = torch.cat([cur_pose_R.reshape(1, 9), cur_pose_T.reshape(1, 3)], dim=1)
+                    anim_arti_param = torch.from_numpy(animation_start_arti_param).to(device).view(1, 20, 3)
+                    cur_arti_param = starting_arti_param * \
+                        (1 - frame_id / (num_frames - 1)) + \
+                        anim_arti_param * (frame_id / (num_frames - 1))
+
+                    cur_mvp, cur_w2c, cur_campos = model.netInstance.get_camera_extrinsics_from_pose(
+                        cur_pose, offset_extra=cur_cam_dist - 10)
+
+                    verts_articulated, aux = skinning(deformed_shape.v_pos, deformed_bones, kinematic_tree, cur_arti_param,
+                                                      output_posed_bones=True, temperature=model.netInstance.skinning_temperature)
+                    verts_articulated = verts_articulated.squeeze(1)
+                    v_tex = prior_shape.v_tex
+                    if len(v_tex) != len(verts_articulated):
+                        v_tex = v_tex.repeat(len(verts_articulated), 1, 1)
+                    posed_shape = make_mesh(
+                        verts_articulated,
+                        prior_shape.t_pos_idx,
+                        v_tex,
+                        prior_shape.t_tex_idx,
+                        shape.material)
+                    current_batch = shape.v_pos.shape[0]
+
+                    _ = model.render(["shaded"], posed_shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+
+                    ori_light_dir = light.light_params[..., :3]
+                    final_dir = torch.matmul(ori_light_dir, w2c[:, :3, :3])
+                    final_dir = torch.matmul(final_dir, cur_w2c[:, :3, :3].transpose(2, 1))[:, 0]
+                    amb, diff = light.light_params[..., 3:4], light.light_params[..., 4:5]
+                    arti_light = FixedDirectionLight(
+                        direction=final_dir, amb=amb, diff=diff)
+
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], posed_shape.extend(current_batch), texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=arti_light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+                    image_pred = shaded[:, :3, :, :]
+                    mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
+                    save_images(image_pred, mask_pred, save_basenames[i:min(
+                        i+batch_size, total_num + 1)], output_dir, suffix="_{:02d}_canon_video_textured".format(frame_id), mode="white")
+
+                canon_imgs_textured = sorted(glob.glob(osp.join(output_dir, "*_canon_video_textured.png")))
+                clip_textured = ImageSequenceClip(canon_imgs_textured, fps=25)
+                clip_textured.write_videofile(osp.join(output_dir, save_basenames[i] + "_canon_textured.mp4"), fps=25)
+                for img in canon_imgs_textured:
+                    os.remove(img)
+
+            if "animation" in render_mode:
+                if args.category != "horse":
+                    raise NotImplementedError("Animation mode is only supported for horse.")
+
+                canonical_pose = torch.concat([torch.eye(3), torch.zeros(1, 3)], dim=0).view(-1)[None].to(device)
+                canonical_mvp, canonical_w2c, canonical_campos = model.netInstance.get_camera_extrinsics_from_pose(
+                    canonical_pose, offset_extra=4)
+
+                viewpoint_arti = torch.FloatTensor([0, -120, 0]) / 180 * np.pi
+                mtx = torch.eye(4).to(device)
+                mtx[:3, :3] = euler_angles_to_matrix(viewpoint_arti, "XYZ")
+                w2c_arti = torch.matmul(canonical_w2c, mtx[None])
+                mvp_arti = torch.matmul(canonical_mvp, mtx[None])
+                campos_arti = canonical_campos @ torch.linalg.inv(mtx[:3, :3]).T
+
+                deformed_bones, kinematic_tree, _ = estimate_bones(
+                    deformed_shape.v_pos[:, None, :, :], model.netInstance.num_body_bones, n_legs=model.netInstance.num_legs, n_leg_bones=model.netInstance.num_leg_bones,
+                    body_bones_mode=model.netInstance.body_bones_mode, compute_kinematic_chain=True, aux=model.netInstance.bone_aux, attach_legs_to_body=True)
+                
+                arti_param_dir = osp.dirname(__file__)
+                arti_param_files = sorted(glob.glob(osp.join(arti_param_dir, "*.txt")))
+                arti_params = np.stack([np.loadtxt(f) for f in arti_param_files], axis=0)
+                arti_params = arti_params / 180 * np.pi
+
+                interpolate_num = 5
+                all_arti_params = []
+                for idx_ in range(0, arti_params.shape[0]):
+                    if idx_ == arti_params.shape[0] - 1:
+                        break
+                    cur_arti_params = arti_params[idx_:idx_+2]
+                    all_arti_params.append(cur_arti_params[0])
+                    for j in range(1, interpolate_num):
+                        all_arti_params.append(cur_arti_params[0] * (1 - j / interpolate_num) + cur_arti_params[1] * (j / interpolate_num))
+                all_arti_params.append(arti_params[-1])
+                all_arti_params = np.stack(all_arti_params, axis=0)
+
+                gray_light = FixedDirectionLight(direction=torch.FloatTensor([0, 0, 1]).to(device), amb=0.2, diff=0.7)
+
+                num_frames = all_arti_params.shape[0]
+
+                for arti_id, arti_param in enumerate(all_arti_params):
+                    rot_angle = torch.FloatTensor([0, np.pi * 2 / (num_frames - 1) * arti_id, 0]).to(device)
+                    arti_param[-12:, 1:] = 0
+                    arti_param[4:6, 1:] = 0
+                    mtx = torch.eye(4).to(device)
+                    mtx[:3, :3] = euler_angles_to_matrix(rot_angle, "XYZ")
+                    cur_w2c = torch.matmul(w2c_arti, mtx[None])
+                    cur_mvp = torch.matmul(mvp_arti, mtx[None])
+                    cur_campos = torch.bmm(torch.linalg.inv(mtx)[None], torch.concat(
+                        [campos_arti, torch.ones_like(campos_arti[..., :1])], dim=-1)[..., None]).squeeze(-1)
+                    cur_campos = cur_campos[..., :3] / cur_campos[..., 3:]
+
+                    arti_param = torch.from_numpy(arti_param).to(device).view(20, 3)[None, None]
+                    verts_articulated, aux = skinning(deformed_shape.v_pos, deformed_bones, kinematic_tree, arti_param,
+                                                      output_posed_bones=True, temperature=model.netInstance.skinning_temperature)
+                    posed_bones = aux["posed_bones"].squeeze(1)
+                    verts_articulated = verts_articulated.squeeze(1)
+                    v_tex = prior_shape.v_tex
+                    if len(v_tex) != len(verts_articulated):
+                        v_tex = v_tex.repeat(len(verts_articulated), 1, 1)
+                    posed_shape = make_mesh(
+                        verts_articulated,
+                        prior_shape.t_pos_idx,
+                        v_tex,
+                        prior_shape.t_tex_idx,
+                        shape.material)
+
+                    _ = model.render(["shaded"], posed_shape, texture_pred, mvp_arti, w2c_arti, campos_arti, resolution,
+                                     im_features=im_features, light=light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+
+                    ori_light_dir = light.light_params[..., :3]
+                    final_dir = torch.matmul(ori_light_dir, w2c[:, :3, :3])
+                    final_dir = torch.matmul(final_dir, w2c_arti[:, :3, :3].transpose(2, 1))[:, 0]
+                    amb, diff = light.light_params[..., 3:4], light.light_params[..., 4:5]
+                    arti_light = FixedDirectionLight(direction=final_dir, amb=amb, diff=diff)
+
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], posed_shape, texture_pred, mvp_arti, w2c_arti, campos_arti, resolution,
+                                     im_features=im_features, light=arti_light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+                    image_pred = shaded[:, :3, :, :]
+                    mask_pred = shaded[:, 3:, :, :].expand_as(image_pred)
+
+                    shaded, shading = \
+                        model.render(["shaded", "shading"], posed_shape, texture_pred, cur_mvp, cur_w2c, cur_campos, resolution,
+                                     im_features=im_features, light=arti_light, prior_shape=prior_shape,
+                                     dino_net=dino_pred, spp=4)
+                    image_pred_rot = shaded[:, :3, :, :]
+                    mask_pred_rot = shaded[:, 3:, :, :].expand_as(image_pred_rot)
+                    save_images(image_pred, mask_pred, save_basenames[i:min(
+                        i+batch_size, total_num + 1)], output_dir, suffix="_{:02d}_animation_video_textured".format(arti_id), mode="white")
+                    save_images(image_pred_rot, mask_pred_rot, save_basenames[i:min(
+                        i+batch_size, total_num + 1)], output_dir, suffix="_{:02d}_animation_video_textured_rot".format(arti_id), mode="white")
+                
+                animation_imgs_textured = sorted(
+                    glob.glob(osp.join(output_dir, "*_animation_video_textured.png")))
+                clip_textured = ImageSequenceClip(
+                    animation_imgs_textured, fps=10)
+                clip_textured.write_videofile(
+                    osp.join(output_dir, save_basenames[i] + "_animation_textured.mp4"), fps=10)
+                animation_imgs_textured_rot = sorted(
+                    glob.glob(osp.join(output_dir, "*_animation_video_textured_rot.png")))
+                clip_textured_rot = ImageSequenceClip(
+                    animation_imgs_textured_rot, fps=10)
+                clip_textured_rot.write_videofile(osp.join(
+                    output_dir, save_basenames[i] + "_animation_textured_rot.mp4"), fps=10)
+                for img in animation_imgs_textured:
+                    os.remove(img)
+                for img in animation_imgs_textured_rot:
+                    os.remove(img)
 
 
 if __name__ == "__main__":
@@ -258,9 +524,9 @@ if __name__ == "__main__":
     parser.add_argument('--config', default=None,
                         type=str)  # Model config path
     parser.add_argument('--checkpoint_path', required=True, type=str)
+    parser.add_argument('--category', default="horse", type=str)  # one of ["horse", "bird"]
     parser.add_argument('--output_dir', required=True, type=str)
     parser.add_argument('--render_mode', nargs="+", type=str, default=["input_view", "other_views"])
-    parser.add_argument('--video', action="store_true")
     parser.add_argument('--resolution', default=256, type=int)
     parser.add_argument('--finetune_texture', action="store_true")
     parser.add_argument('--finetune_iters', default=50, type=int)

@@ -96,7 +96,7 @@ For more precise texture optimization, provide instance masks in the same folder
 ## TODO
 - [x] Test time texture finetuning
 - [x] Novel view visualization script
-- [ ] Animation visualization script
+- [x] Animation visualization script
 - [ ] Evaluation scripts
 - [ ] Data preprocessing scripts
 
