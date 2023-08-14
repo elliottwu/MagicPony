@@ -81,9 +81,22 @@ python run.py --config config/quadrupeds/train_horse.yml --gpu 0 --num_workers 4
 python run.py --config config/quadrupeds/test_horse.yml --gpu 0 --num_workers 4
 ```
 
+## Visualize Results
+Check `scripts/visualize_results.py` and run, eg:
+```
+python scripts/visualize_results.py --input_image_dir path/to/folder/that/contains/input/images --config the/config/used/to/train/the/model.yml --checkpoint_path path/to/the/pretrained/checkpoint.pth --output_dir folder/to/save/the/renderings
+```
+`input_image_dir` should contain test images named as `*_rgb.*`.
+
+### Test-time Texture Finetuning
+To enable test time texture finetuning, use the flag `--finetune_texture`, and (optionally) adjust the number of finetune iterations `--finetune_iters` and learning rate `--finetune_lr`.
+
+For more precise texture optimization, provide instance masks in the same folder as `*_mask.png`. Otherwise, the background pixels might be pasted onto the object if shape predictions are not perfect aligned.
+
 ## TODO
-- [ ] Test time texture fintuning
-- [ ] Visualization scripts
+- [x] Test time texture finetuning
+- [x] Novel view visualization script
+- [ ] Animation visualization script
 - [ ] Evaluation scripts
 - [ ] Data preprocessing scripts
 
