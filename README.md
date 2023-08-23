@@ -38,6 +38,13 @@ imageio_download_bin freeimage
 ```
 *Note*: The code is tested with tinycudann=1.6 and it requires GCC/G++ > 7.5 (conda's gxx also works: `conda install -c conda-forge gxx_linux-64=9.4.0`).
 
+### 4. Install [PyTorch3D](https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md) (for visulaization)
+```
+conda install -c fvcore -c iopath -c conda-forge fvcore iopath
+conda install -c bottler nvidiacub
+conda install pytorch3d -c pytorch3d
+```
+
 ## Data
 The preprocessed datasets can be downloaded using the scripts in `data/`, including birds, horses, giraffes, zebras and cows:
 ```
@@ -80,13 +87,27 @@ Check the configuration files in `config/` and run, eg:
 python run.py --config config/quadrupeds/train_horse.yml --gpu 0 --num_workers 4
 python run.py --config config/quadrupeds/test_horse.yml --gpu 0 --num_workers 4
 ```
+The test script saves some visualizations, including reconstruction images from input view, viewpoint and the resulting mesh in `.obj` format. For more visualizations, use the `scripts/visualize_results.py` as explained below.
 
 ## Visualize Results
 Check `scripts/visualize_results.py` and run, eg:
 ```
-python scripts/visualize_results.py --input_image_dir path/to/folder/that/contains/input/images --config the/config/used/to/train/the/model.yml --checkpoint_path path/to/the/pretrained/checkpoint.pth --output_dir folder/to/save/the/renderings
+python scripts/visualize_results.py \
+--input_image_dir path/to/folder/that/contains/input/images \
+--config path/to/the/test/config.yml \
+--checkpoint_path path/to/the/pretrained/checkpoint.pth \
+--output_dir folder/to/save/the/renderings \
+--render_modes input_view other_views
 ```
-`input_image_dir` should contain test images named as `*_rgb.*`.
+`--input_image_dir` should contain test images named as `*_rgb.*`.
+
+Supported `--render_modes` include:
+- `input_view`: image rendered from the input viewpoint of the reconstructed textured mesh, shading map, gray shape visualization
+- `other_views`: image rendered from 12 viewpoints rotating around the vertical axis of the reconstructed textured mesh, gray shape visualization
+- `rotation`: video rendered from continuously rotating viewpoints around the vertical axis of the reconstructed textured mesh, gray shape visualization 
+- `animation` (only suported for horses): two videos rendered from both a side viewpoint and continously rotating viewpoints of the reconstructed textured mesh animated using a sequence of pre-configured articulation parameters. `--arti_param_dir` is required which should contain a sequence of keyframe articulation parameters. By default, it points to `./scripts/animation_params` which contains a set of pre-computed parameters.
+- `canonicalization` (only suported for horses): video of the reconstructed textured mesh morphing from the input pose to a pre-configured canonical pose
+
 
 ### Test-time Texture Finetuning
 To enable test time texture finetuning, use the flag `--finetune_texture`, and (optionally) adjust the number of finetune iterations `--finetune_iters` and learning rate `--finetune_lr`.
@@ -96,7 +117,7 @@ For more precise texture optimization, provide instance masks in the same folder
 ## TODO
 - [x] Test time texture finetuning
 - [x] Novel view visualization script
-- [ ] Animation visualization script
+- [x] Animation visualization script
 - [ ] Evaluation scripts
 - [ ] Data preprocessing scripts
 
