@@ -9,8 +9,9 @@ import argparse
 import glob
 from tqdm import tqdm
 from PIL import Image
+from matplotlib import pyplot as plt
 from moviepy.editor import ImageSequenceClip
-import numpy as np
+import numpy as npf
 from pytorch3d import transforms
 import torch
 import torchvision
@@ -18,6 +19,7 @@ import nvdiffrast.torch as dr
 from magicpony.model import MagicPony
 from magicpony import setup_runtime
 from magicpony.render.mesh import make_mesh
+import magicpony.render.renderutils as ru
 from magicpony.geometry.skinning import estimate_bones, skinning, euler_angles_to_matrix
 from magicpony.render import util
 
@@ -26,6 +28,13 @@ def pil_loader(path: str) -> Image.Image:
     with open(path, "rb") as f:
         img = Image.open(f)
         return img.convert("RGB")
+
+
+def save_txts(arrays, base_names, out_dir, suffix=""):
+    for arr, base_name in zip(arrays, base_names):
+        arr = arr.cpu().numpy()
+        os.makedirs(out_dir, exist_ok=True)
+        np.savetxt(osp.join(out_dir, base_name + suffix + ".txt"), arr)
 
 
 def save_images(images, mask_pred, base_names, out_dir, suffix="", mode="transparent"):
@@ -180,6 +189,67 @@ def main(args):
                 deformed_shape = prior_shape.deform(deform)
             else:
                 deformed_shape = prior_shape
+
+            if args.evaluate_keypoint:
+                save_txts(shape.v_pos, save_basenames[i:min(
+                    i+batch_size, total_num + 1)], output_dir, suffix="_posed_verts")
+                save_txts(pose, save_basenames[i:min(
+                    i+batch_size, total_num + 1)], output_dir, suffix="_pose")
+                
+                v_pos_clip4 = ru.xfm_points(shape.v_pos, mvp)
+                v_pos_uv = v_pos_clip4[..., :2] / v_pos_clip4[..., 3:]
+                save_txts(v_pos_uv, save_basenames[i:min(
+                    i+batch_size, total_num + 1)], output_dir, suffix="_2d_projection_uv")
+                
+                # Render occlusion
+                glctx = dr.RasterizeGLContext()
+                v_pos_clip4 = ru.xfm_points(shape.v_pos, mvp)
+                v_pos_uv = v_pos_clip4[..., :2] / v_pos_clip4[..., 3:]
+                rast, _ = dr.rasterize(
+                    glctx, v_pos_clip4, shape.t_pos_idx[0].int(), resolution)
+                face_ids = rast[..., -1]
+                face_ids = face_ids.view(-1, resolution[0] * resolution[1])
+                current_batch, num_verts, _ = shape.v_pos.shape
+                res = []
+                rendered = []
+                dpi = 32
+                fx, fy = resolution[1] // dpi, resolution[0] // dpi
+
+                for b in range(current_batch):
+                    current_face_ids = face_ids[b]
+                    current_face_ids = current_face_ids[current_face_ids > 0]
+                    visible_verts = shape.t_pos_idx[0][(
+                        current_face_ids - 1).long()].view(-1)
+                    visible_verts = torch.unique(visible_verts)
+                    visibility = torch.zeros(num_verts, device=device)
+                    visibility[visible_verts] = 1
+                    res += [visibility]
+                    fig = plt.figure(figsize=(fx, fy), dpi=dpi, frameon=False)
+                    ax = plt.Axes(fig, [0., 0., 1., 1.])
+                    ax.set_axis_off()
+                    ax.scatter(v_pos_uv[b, visibility == 1, 0].cpu().numpy(
+                    ), v_pos_uv[b, visibility == 1, 1].cpu().numpy(), s=1, c="red")
+                    ax.scatter(v_pos_uv[b, visibility == 0, 0].cpu().numpy(
+                    ), v_pos_uv[b, visibility == 0, 1].cpu().numpy(), s=1, c="black")
+                    ax.set_xlim(-1, 1)
+                    ax.set_ylim(-1, 1)
+                    ax.invert_yaxis()
+                    # Convert to image
+                    fig.add_axes(ax)
+                    fig.canvas.draw_idle()
+                    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                    w, h = fig.canvas.get_width_height()
+                    image.resize(h, w, 3)
+                    rendered += [image / 255.]
+                rendered = torch.from_numpy(np.stack(rendered, 0).transpose(0, 3, 1, 2))
+                combined = rendered * 0.5 + input_image.cpu().squeeze(1) * 0.5
+                res = torch.stack(res, 0)
+                save_txts(res, save_basenames[i:min(
+                    i+batch_size, total_num + 1)], output_dir, suffix="_binary_occlusion")
+                save_images(combined, None, save_basenames[i:min(
+                    i+batch_size, total_num + 1)], output_dir, suffix="_2d_projection_image")
+
+                continue
 
             if "input_view" in render_modes:
                 shaded, shading, albedo = \
@@ -524,6 +594,7 @@ if __name__ == "__main__":
     parser.add_argument('--render_modes', nargs="+", type=str, default=["input_view", "other_views"])
     parser.add_argument('--arti_param_dir', type=str, default='./scripts/animation_params')
     parser.add_argument('--resolution', default=256, type=int)
+    parser.add_argument('--evaluate_keypoint', action="store_true")
     parser.add_argument('--finetune_texture', action="store_true")
     parser.add_argument('--finetune_iters', default=50, type=int)
     parser.add_argument('--finetune_lr', default=0.001, type=float)
