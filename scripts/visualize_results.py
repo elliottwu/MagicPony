@@ -11,7 +11,7 @@ from tqdm import tqdm
 from PIL import Image
 from matplotlib import pyplot as plt
 from moviepy.editor import ImageSequenceClip
-import numpy as npf
+import numpy as np
 from pytorch3d import transforms
 import torch
 import torchvision
@@ -252,7 +252,7 @@ def main(args):
                 continue
 
             if "input_view" in render_modes:
-                shaded, shading, albedo = \
+                shaded, shading, _ = \
                     model.render(["shaded", "shading", "kd"], shape, texture_pred, mvp, w2c, campos, resolution,
                                  im_features=im_features, light=light, prior_shape=prior_shape,
                                  dino_net=dino_pred, spp=4, num_frames=1)
