@@ -127,7 +127,7 @@ python scripts/visualize_results.py \
 ```
 Note we specified the `--evaluate_keypoint` flag.
 
-Then, use the following the compute the keypoint transfer metric:
+Then, use the following to compute the keypoint transfer metric:
 ```
 python evaluation/evaluate.py \
 --acsm_annotations_root path/to/acsm/annotation/root \
@@ -136,6 +136,10 @@ python evaluation/evaluate.py \
 --predictions_test_dir the/output/dir/from/the/previous/command \
 --box_pad_frac 0.05
 ```
+The code should automatically download the A-CSM annotations to the specified path, providing the user has write access to the path. If the script fails to download 
+the annotations, they can be downloaded manually via [Dropbox](https://www.dropbox.com/s/3tj037gnk4gz11t/cachedir.tar?dl=1). The `--acsm_annotations_root` should be the path to the
+folder that contains the extracted `cachedir` folder from the tar file.
+
 As A-CSM forgot to correct for their box padding, we add the 0.05 here for consistency.
 
 ## TODO
