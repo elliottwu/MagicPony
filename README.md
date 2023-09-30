@@ -114,6 +114,30 @@ To enable test time texture finetuning, use the flag `--finetune_texture`, and (
 
 For more precise texture optimization, provide instance masks in the same folder as `*_mask.png`. Otherwise, the background pixels might be pasted onto the object if shape predictions are not perfect aligned.
 
+
+## Evaluation
+We evaluate our method quatitatively with the keypoint transfer metric on the PASCAL dataset, following [A-CSM](https://arxiv.org/abs/2004.00614). To compute the metric, we first extract the mesh vertices with `scripts/visualize_results.py`, with a slight abuse of the script:
+```
+python scripts/visualize_results.py \
+--input_image_dir path/to/preprocessed/pascal/images \
+--config path/to/the/test/config.yml \
+--checkpoint_path path/to/the/pretrained/checkpoint.pth \
+--output_dir folder/to/save/the/output \
+--evaluate_keypoint
+```
+Note we specified the `--evaluate_keypoint` flag.
+
+Then, use the following the compute the keypoint transfer metric:
+```
+python evaluation/evaluate.py \
+--acsm_annotations_root path/to/acsm/annotation/root \
+--pascal_category horse \
+--data_dir_test path/to/preprocessed/pascal/images \
+--predictions_test_dir the/output/dir/from/the/previous/command \
+--box_pad_frac 0.05
+```
+As A-CSM forgot to correct for their box padding, we add the 0.05 here for consistency.
+
 ## TODO
 - [x] Test time texture finetuning
 - [x] Novel view visualization script
