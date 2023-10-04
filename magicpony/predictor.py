@@ -225,6 +225,7 @@ class InstancePredictor(nn.Module):
             self.num_leg_bones = cfgs.get('num_leg_bones', 0)
             self.num_bones = self.num_body_bones + self.num_legs * self.num_leg_bones
             self.attach_legs_to_body_epochs = np.arange(*cfgs.get('attach_legs_to_body_epochs', [0, 0]))
+            self.legs_to_body_joint_indices = cfgs.get('legs_to_body_joint_indices', None)
             self.static_root_bones = cfgs.get('static_root_bones', False)
             self.skinning_temperature = cfgs.get('skinning_temperature', 1)
             self.max_arti_angle = cfgs.get('max_arti_angle', 60)
@@ -346,7 +347,7 @@ class InstancePredictor(nn.Module):
         ## recompute kinematic tree at the beginning of each epoch
         if self.kinematic_tree_epoch != epoch:
             attach_legs_to_body = epoch in self.attach_legs_to_body_epochs
-            bones, self.kinematic_tree, self.bone_aux = estimate_bones(verts.detach(), self.num_body_bones, n_legs=self.num_legs, n_leg_bones=self.num_leg_bones, body_bones_mode=self.body_bones_mode, compute_kinematic_chain=True, attach_legs_to_body=attach_legs_to_body)
+            bones, self.kinematic_tree, self.bone_aux = estimate_bones(verts.detach(), self.num_body_bones, n_legs=self.num_legs, n_leg_bones=self.num_leg_bones, body_bones_mode=self.body_bones_mode, compute_kinematic_chain=True, attach_legs_to_body=attach_legs_to_body, legs_to_body_joint_indices=self.legs_to_body_joint_indices)
             self.kinematic_tree_epoch = epoch
         else:
             bones = estimate_bones(verts.detach(), self.num_body_bones, n_legs=self.num_legs, n_leg_bones=self.num_leg_bones, body_bones_mode=self.body_bones_mode, compute_kinematic_chain=False, aux=self.bone_aux)

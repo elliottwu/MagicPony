@@ -47,7 +47,7 @@ def update_body_kinematic_chain(kinematic_chain, leg_kinematic_chain, body_bone_
 
 
 @torch.no_grad()
-def estimate_bones(seq_shape, n_body_bones, resample=False, n_legs=4, n_leg_bones=0, body_bones_mode='z_minmax', compute_kinematic_chain=True, aux=None, attach_legs_to_body=True):
+def estimate_bones(seq_shape, n_body_bones, resample=False, n_legs=4, n_leg_bones=0, body_bones_mode='z_minmax', compute_kinematic_chain=True, aux=None, attach_legs_to_body=True, legs_to_body_joint_indices=None):
     """
     Estimate the position and structure of bones given the mesh vertex positions.
 
@@ -183,10 +183,8 @@ def estimate_bones(seq_shape, n_body_bones, resample=False, n_legs=4, n_leg_bone
             return all_joints, body_bone_idx
 
         quadrants = [quadrant0, quadrant1, quadrant2, quadrant3]
-        body_bone_idxs = [None, None, None, None]
-        # body_bone_idxs = [2, 6, 6, 2]  # 2, 2
-        # body_bone_idxs = [2, 7, 7, 2]  # 3, 2
-        # body_bone_idxs = [3, 6, 6, 3]
+        if legs_to_body_joint_indices is None:
+            legs_to_body_joint_indices = [None, None, None, None]
         start_bone_idx = n_body_bones
         all_leg_bones = []
         if compute_kinematic_chain:
@@ -196,14 +194,14 @@ def estimate_bones(seq_shape, n_body_bones, resample=False, n_legs=4, n_leg_bone
         for i, quadrant in enumerate(quadrants):
             if compute_kinematic_chain:
                 leg_i_aux = {}
-                body_bone_idx = body_bone_idxs[i]
+                body_bone_idx = legs_to_body_joint_indices[i]
                 if i == 2:
-                    body_bone_idx = body_bone_idxs[1]
+                    body_bone_idx = legs_to_body_joint_indices[1]
                 elif i == 3:
-                    body_bone_idx = body_bone_idxs[0]
+                    body_bone_idx = legs_to_body_joint_indices[0]
 
                 leg_joints, body_bone_idx = find_leg_in_quadrant(quadrant, n_leg_bones, body_bone_idx=body_bone_idx)
-                body_bone_idxs[i] = body_bone_idx
+                legs_to_body_joint_indices[i] = body_bone_idx
 
                 leg_bones_to_joints, leg_kinematic_chain, leg_bone_idxs = build_kinematic_chain(n_leg_bones, start_bone_idx=start_bone_idx)
                 kinematic_chain = update_body_kinematic_chain(kinematic_chain, leg_kinematic_chain, body_bone_idx, leg_bone_idxs, attach_legs_to_body=attach_legs_to_body)
