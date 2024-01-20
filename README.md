@@ -104,9 +104,10 @@ python scripts/visualize_results.py \
 Supported `--render_modes` include:
 - `input_view`: image rendered from the input viewpoint of the reconstructed textured mesh, shading map, gray shape visualization
 - `other_views`: image rendered from 12 viewpoints rotating around the vertical axis of the reconstructed textured mesh, gray shape visualization
-- `rotation`: video rendered from continuously rotating viewpoints around the vertical axis of the reconstructed textured mesh, gray shape visualization 
-- `animation` (only suported for horses): two videos rendered from both a side viewpoint and continously rotating viewpoints of the reconstructed textured mesh animated using a sequence of pre-configured articulation parameters. `--arti_param_dir` is required which should contain a sequence of keyframe articulation parameters. By default, it points to `./scripts/animation_params` which contains a set of pre-computed parameters.
-- `canonicalization` (only suported for horses): video of the reconstructed textured mesh morphing from the input pose to a pre-configured canonical pose
+- `rotation`: video rendered from continuously rotating viewpoints around the vertical axis of the reconstructed textured mesh, gray shape visualization
+- `animation` (only supported for horses): two videos rendered from both a side viewpoint and continously rotating viewpoints of the reconstructed textured mesh animated by interpolating a sequence of pre-configured articulation parameters.
+`--arti_param_dir` points to `./scripts/animation_params` by default which contains a sequence of pre-computed keyframe articulation parameters.
+- `canonicalization` (only supported for horses): video of the reconstructed textured mesh morphing from the input pose to a pre-configured canonical pose
 
 
 ### Test-time Texture Finetuning

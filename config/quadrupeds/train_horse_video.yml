@@ -101,6 +101,7 @@ body_bones_mode: z_minmax_y+  # z_minmax, z_minmax_y+
 num_legs: 4
 num_leg_bones: 3
 attach_legs_to_body_epochs: [50, 1000]
+# legs_to_body_joint_indices: [2, 7, 7, 2]  # fix the joint indices of the body bone that the leg bones attach to. If None, it finds the closest joints
 static_root_bones: false
 skinning_temperature: 0.05  # the smaller, the peakier
 max_arti_angle: 60
