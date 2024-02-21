@@ -3,7 +3,7 @@ run_train: false
 run_test: true
 batch_size: 10
 checkpoint_dir: results/quadrupeds/pretrained_horse
-checkpoint_name: checkpoint120.pth
+checkpoint_name: pretrained_horse.pth
 archive_code: false
 use_logger: false
 
