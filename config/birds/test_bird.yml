@@ -8,7 +8,7 @@ archive_code: false
 use_logger: false
 
 test_data_dir: data/bird_videos_bonanza/test
-test_result_dir: results/birds/final_bird/test_results_bonanza_020
+test_result_dir: results/birds/final_bird/test_results_bonanza_0020
 
 ## dataloader
 data_type: sequence  # sequence, image

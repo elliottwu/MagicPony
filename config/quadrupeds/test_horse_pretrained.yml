@@ -8,7 +8,7 @@ archive_code: false
 use_logger: false
 
 test_data_dir: data/horse_combined/test
-test_result_dir: results/quadrupeds/pretrained_horse/test_results_combined_120
+test_result_dir: results/quadrupeds/pretrained_horse/test_results_combined_pretrained
 
 ## dataloader
 data_type: sequence  # sequence, image
