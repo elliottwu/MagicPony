@@ -31,7 +31,7 @@ num_frames: 1
 skip_beginning: 0
 skip_end: 0
 min_seq_len: 1
-random_xflip_train: truez
+random_xflip_train: true
 
 ## model
 lr: 0.0001
