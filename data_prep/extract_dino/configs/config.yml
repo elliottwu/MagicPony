@@ -1,0 +1,33 @@
+train_root: [/path/to/dataset/split/1/for/training/pca, /path/to/dataset/split/2/for/training/pca]
+test_root: [/path/to/dataset/split/1/for/feature/extraction, /path/to/dataset/split/2/for/feature/extraction]
+exp_name: experiment
+clusters_out_root: /path/to/save/cluster/results
+features_out_root: /path/to/save/feature/results
+results_info_root: /path/to/save/results/info
+vis_out_root: out
+n_clusters: 12
+name_depth: 3
+
+image_size: 256
+img_pad: 4
+
+n_images_cluster: 50
+metric: cos
+
+pca_dim: 64
+save_pca_features: True
+
+save_clusters: True
+
+save_visuals: True
+
+normalize_features: True
+
+device: cuda:0
+faiss_device: 1
+
+shuffle_data: True
+batch_size: 6
+
+use_saliency: True
+load_mask: True
