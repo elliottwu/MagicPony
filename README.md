@@ -1,4 +1,7 @@
 # 🎠 MagicPony: Learning Articulated 3D Animals in the Wild (CVPR 2023)
+
+**Update**: check out the new [3DAnimals](https://github.com/3DAnimals/3DAnimals) repo for a unified implementation of several recent publications on 3D animals!
+
 #### [Project Page](https://3dmagicpony.github.io/) | [Video](https://youtu.be/KoLzpESstLk) | [Paper](https://arxiv.org/abs/2211.12497)
 
 
@@ -153,7 +156,7 @@ As A-CSM forgot to correct for their box padding, we add the 0.05 here for consi
 ## Citation
 ```
 @InProceedings{wu2023magicpony,
-  author    = {Shangzhe Wu and Ruining Li and Tomas Jakab and Christian Rupprecht and Andrea Vedaldi},
+  author    = {Wu, Shangzhe and Li, Ruining and Jakab, Tomas and Rupprecht, Christian and Vedaldi, Andrea},
   title     = {{MagicPony}: Learning Articulated 3D Animals in the Wild},
   booktitle = {CVPR},
   year      = {2023}
